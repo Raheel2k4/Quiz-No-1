@@ -1,51 +1,30 @@
 import React, { useContext, useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, SafeAreaView } from 'react-native';
 import { AppContext } from '../context/AppContext';
+// Ensure AttendanceToggle component is available in ../components/AttendanceToggle
 import AttendanceToggle from '../components/AttendanceToggle';
 
 export default function TakeAttendanceScreen({ route, navigation }) {
   const { classId } = route.params;
-  const { students, currentAttendance, setCurrentAttendance, takeAttendance } = useContext(AppContext);
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [loading, setLoading] = useState(false); // New loading state
-  
+  const { students, takeAttendance, loading } = useContext(AppContext);
   const classStudents = students[classId] || [];
 
+  // State to track attendance for the current session: { studentId: boolean (true = present) }
+  const [currentAttendance, setCurrentAttendance] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Set the current date for the attendance record
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Effect to initialize attendance when the screen loads or classId changes
   useEffect(() => {
-    // Initialize attendance for all students as present when the screen loads
+    // Initialize all students as PRESENT by default
     const initialAttendance = {};
     classStudents.forEach(student => {
       initialAttendance[student.id] = true;
     });
     setCurrentAttendance(initialAttendance);
-  }, [classId, students]); // Added students to dependencies to re-initialize if student list changes
-
-  const handleSubmit = async () => {
-    if (classStudents.length === 0) {
-      Alert.alert('Error', 'Cannot submit attendance for an empty class.');
-      return;
-    }
-    
-    setLoading(true);
-    
-    try {
-      // takeAttendance is an asynchronous operation (for real-world data saving)
-      const success = await takeAttendance(classId, date);
-      
-      if (success) {
-        Alert.alert('Success', 'Attendance recorded successfully!');
-        navigation.goBack();
-      } else {
-        // If the context function returns false or implicitly fails
-        Alert.alert('Submission Failed', 'An error occurred while recording attendance. Please try again.');
-      }
-    } catch (error) {
-      console.error('Attendance submission error:', error);
-      Alert.alert('Error', 'An unexpected network error occurred.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [classId, students]); // Reruns if classId or students data changes
 
   const toggleAttendance = (studentId) => {
     setCurrentAttendance(prev => ({
@@ -54,80 +33,148 @@ export default function TakeAttendanceScreen({ route, navigation }) {
     }));
   };
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Take Attendance</Text>
-      <Text style={styles.date}>Date: {date}</Text>
+  const handleSubmit = () => {
+    if (isSubmitting) return;
+
+    if (classStudents.length === 0) {
+      Alert.alert('Cannot Submit', 'Please add students to this class before taking attendance.');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      // Call the context function to process and save the attendance data
+      takeAttendance(classId, date, currentAttendance);
       
-      {classStudents.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No students in this class. Add students from the Class Detail screen.</Text>
+      Alert.alert('Success', `Attendance for ${date} recorded successfully!`);
+      
+      // Navigate back to the Class Detail screen
+      navigation.goBack();
+      
+    } catch (error) {
+      console.error("Error submitting attendance:", error);
+      Alert.alert('Error', 'Failed to submit attendance. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Loading class data...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+            <Text style={styles.title}>Take Attendance</Text>
+            <Text style={styles.dateLabel}>Session Date: <Text style={styles.dateValue}>{date}</Text></Text>
         </View>
-      ) : (
+        
         <ScrollView style={styles.studentList}>
           {classStudents.map(student => (
             <AttendanceToggle
               key={student.id}
               student={student}
-              isPresent={!!currentAttendance[student.id]} // Ensure boolean check
+              // Check if the student ID exists in currentAttendance state, default to true if missing
+              isPresent={currentAttendance[student.id] !== undefined ? currentAttendance[student.id] : true}
               onToggle={() => toggleAttendance(student.id)}
-              disabled={loading} // Disable toggles while submitting
             />
           ))}
+          {classStudents.length === 0 && (
+             <Text style={styles.emptyText}>No students in this class. Add some from the Class Detail screen!</Text>
+          )}
         </ScrollView>
-      )}
 
-      <TouchableOpacity 
-        style={styles.submitButton} 
-        onPress={handleSubmit}
-        disabled={loading || classStudents.length === 0}
-      >
-        {loading ? (
+        <TouchableOpacity 
+          style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} 
+          onPress={handleSubmit}
+          disabled={isSubmitting || classStudents.length === 0}
+        >
+          {isSubmitting ? (
             <ActivityIndicator color="white" />
-        ) : (
+          ) : (
             <Text style={styles.submitButtonText}>Submit Attendance</Text>
-        )}
-      </TouchableOpacity>
-    </View>
+          )}
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: '#f5f5f5' },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 10, color: '#007AFF' },
-  date: { fontSize: 16, marginBottom: 20, color: 'gray', fontWeight: '500' },
-  studentList: { 
+  safeArea: { 
     flex: 1, 
-    marginBottom: 10,
+    backgroundColor: '#F7F9FC' 
   },
-  submitButton: {
-    backgroundColor: '#34C759',
-    padding: 15,
-    borderRadius: 10,
+  container: { 
+    flex: 1, 
+    padding: 20,
+  },
+  header: {
+    marginBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    paddingBottom: 10,
+  },
+  title: { 
+    fontSize: 28, 
+    fontWeight: '700', 
+    color: '#007AFF' 
+  },
+  dateLabel: { 
+    fontSize: 16, 
+    color: '#64748B' 
+  },
+  dateValue: {
+    fontWeight: '600',
+    color: '#333'
+  },
+  studentList: {
+    flex: 1,
+    paddingVertical: 10,
+  },
+  submitButton: { 
+    backgroundColor: '#34C759', // Green for Submit
+    padding: 15, 
+    borderRadius: 12, 
     alignItems: 'center',
-    marginTop: 10,
-    minHeight: 50,
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
+    marginTop: 20,
+    shadowColor: '#34C759',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 8,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#A0D8B4',
   },
   submitButtonText: { 
     color: 'white', 
-    fontWeight: 'bold', 
+    fontWeight: 'bold',
     fontSize: 18 
   },
-  emptyContainer: {
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 50,
+    fontSize: 16,
+    color: '#94A3B8',
+  },
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    backgroundColor: '#F7F9FC'
   },
-  emptyText: {
+  loadingText: {
+    marginTop: 10,
     fontSize: 16,
-    color: 'gray',
-    textAlign: 'center',
+    color: '#64748B',
   }
 });

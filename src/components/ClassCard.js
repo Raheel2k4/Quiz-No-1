@@ -6,6 +6,7 @@ export default function ClassCard({ classItem, onPress }) {
     <TouchableOpacity style={styles.card} onPress={onPress}>
       <Text style={styles.className}>{classItem.name}</Text>
       <View style={styles.stats}>
+        {/* Ensure all content, including static text and variables, is wrapped in Text components */}
         <Text style={styles.stat}>Students: {classItem.students}</Text>
         <Text style={[styles.stat, styles.rate]}>
           Attendance: {classItem.attendanceRate}%
@@ -45,6 +46,6 @@ const styles = StyleSheet.create({
   },
   rate: {
     fontWeight: 'bold',
-    color: '#34C759'
+    color: '#28A745' // Green for a good rate
   }
 });

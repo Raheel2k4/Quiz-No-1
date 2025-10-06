@@ -4,6 +4,18 @@
       "id": "user123",
       "email": "teacher@example.com",
       "password": "password123"
+    },
+    {
+      "id": "1759604283471",
+      "email": "test@student.com",
+      "password": "12345"
+    },
+    {
+      "id": 1759604283473,
+      "name": "Raheel",
+      "email": "abc@example.com",
+      "password": "12345",
+      "displayName": "Raheel"
     }
   ],
   "classes": [
@@ -18,9 +30,32 @@
       "name": "Science 201",
       "studentsCount": 1,
       "attendanceRate": 92
+    },
+    {
+      "id": 3,
+      "name": "COAL",
+      "userId": "1759604283471",
+      "students": 1,
+      "attendanceRate": 0,
+      "totalSessions": 0
+    },
+    {
+      "id": 1759604283474,
+      "userId": 1759604283473,
+      "name": "MAD",
+      "students": 0,
+      "attendanceRate": 0
     }
   ],
   "students": {
+    "3": [
+      {
+        "id": 1759604283477,
+        "name": "Ali",
+        "registrationNumber": "8282",
+        "classId": 3
+      }
+    ],
     "c1": [
       {
         "id": "s1",
@@ -39,9 +74,11 @@
         "name": "Bob Johnson",
         "email": "bob@example.com"
       }
-    ]
+    ],
+    "1759604283474": []
   },
   "attendance": {
+    "3": [],
     "c1": [
       {
         "date": "2023-10-01",
@@ -60,6 +97,7 @@
         "studentId": "s3",
         "present": true
       }
-    ]
+    ],
+    "1759604283474": []
   }
 }
