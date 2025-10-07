@@ -9,6 +9,7 @@ const port = 3000;
 const SECRET_KEY = 'your_jwt_secret'; // Use a strong, secret key in a real app
 
 // --- LowDB Setup ---
+// Use the relative path 'db.json' since server.js is running from the backend directory
 const adapter = new FileSync('db.json');
 const db = low(adapter);
 
@@ -34,276 +35,372 @@ const authenticateToken = (req, res, next) => {
 
 // --- Helper Functions ---
 
-// Calculates the total attendance rate for a class
-function updateClassStats(classId) {
-    const classIdStr = classId.toString();
-    
-    const studentsInClass = db.get('students').value()[classIdStr] || [];
-    const attendanceRecords = db.get('attendance').value()[classIdStr] || [];
+// Function to safely retrieve all relevant user data (classes, students, attendance)
+function getUserData(userId) {
+    const userClasses = db.get('classes').filter({ userId: userId }).value();
+    const userClassIds = userClasses.map(c => c.id);
+    const userStudents = {};
+    const userAttendance = {};
 
-    const totalStudents = studentsInClass.length;
-    
-    let totalSessions = 0;
-    let totalPresent = 0;
-
-    // Group records by date to find the number of unique sessions
-    const sessions = attendanceRecords.reduce((acc, record) => {
-        if (!acc[record.date]) {
-            acc[record.date] = [];
+    // Filter students cache to only include classes owned by the user
+    Object.keys(db.get('students').value()).forEach(classId => {
+        // IDs are stored as strings in the students/attendance cache keys
+        if (userClassIds.includes(parseInt(classId))) {
+            userStudents[classId] = db.get('students').value()[classId];
         }
-        acc[record.date].push(record);
-        return acc;
-    }, {});
-
-    totalSessions = Object.keys(sessions).length;
-
-    // Calculate total present students across all sessions
-    Object.values(sessions).forEach(sessionRecords => {
-        totalPresent += sessionRecords.filter(r => r.present).length;
     });
 
-    // Total possible attendance checks (Total Students * Total Sessions)
-    const totalPossibleChecks = totalStudents * totalSessions;
-    
-    let attendanceRate = 0;
-    if (totalPossibleChecks > 0) {
-        attendanceRate = Math.round((totalPresent / totalPossibleChecks) * 100);
-    }
+    // Filter attendance cache to only include classes owned by the user
+    Object.keys(db.get('attendance').value()).forEach(classId => {
+        if (userClassIds.includes(parseInt(classId))) {
+            userAttendance[classId] = db.get('attendance').value()[classId];
+        }
+    });
 
-    // Update the class document
+    return { classes: userClasses, students: userStudents, attendance: userAttendance };
+}
+
+
+// Calculates the total attendance rate for a class and updates its record
+function updateClassStats(classId) {
+    const classIdStr = classId.toString();
+    const classAttendance = db.get('attendance').value()[classIdStr] || [];
+    const classStudents = db.get('students').value()[classIdStr] || [];
+
+    const totalStudents = classStudents.length;
+
+    // Calculate total attendance count (total records across all dates)
+    const totalRecords = classAttendance.length;
+    const presentRecords = classAttendance.filter(r => r.present).length;
+
+    let attendanceRate = 0;
+    if (totalRecords > 0) {
+        // Rate is calculated based on total present vs total records
+        attendanceRate = Math.round((presentRecords / totalRecords) * 100);
+    }
+    
+    // Update the class record with calculated stats
     db.get('classes')
-        .find({ id: parseInt(classIdStr) })
-        .assign({ 
-            students: totalStudents, 
-            attendanceRate: attendanceRate,
-            totalSessions: totalSessions, // Store sessions count for reports
+        .find({ id: parseInt(classId) })
+        .assign({
+            students: totalStudents,
+            attendanceRate: attendanceRate
         })
         .write();
 }
 
-// Helper to generate unique numeric IDs
-let nextId = Math.max(
-    ...db.get('users').map('id').value().map(id => parseInt(id.replace('u', '')) || 0),
-    ...db.get('classes').map('id').value().map(id => parseInt(id) || 0),
-    100
-) + 1;
-
-function getNextId() {
-    return nextId++;
-}
-
 // --- API Router ---
 const apiRouter = express.Router();
+apiRouter.use(bodyParser.json());
 
-// Helper to fetch user-specific data
-const getUserData = (userId) => {
-    const userClasses = db.get('classes').filter({ userId: userId }).value();
-    const userClassIds = userClasses.map(c => c.id.toString());
-    
-    // Filter students and attendance to only include data for the user's classes
-    const allStudents = db.get('students').value();
-    const userStudents = {};
-    userClassIds.forEach(id => {
-        if (allStudents[id]) {
-            userStudents[id] = allStudents[id];
-        }
-    });
-
-    const allAttendance = db.get('attendance').value();
-    const userAttendance = {};
-    userClassIds.forEach(id => {
-        if (allAttendance[id]) {
-            userAttendance[id] = allAttendance[id];
-        }
-    });
-
-    return {
-        classes: userClasses,
-        students: userStudents,
-        attendance: userAttendance,
-    };
-};
-
-// --- AUTH ROUTES ---
-
-// POST /api/register
+// --- User Registration (Register) ---
 apiRouter.post('/register', (req, res) => {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password) return res.status(400).json({ message: 'Please provide name, email, and password' });
+    const { name, email, password, displayName } = req.body;
 
-    const existingUser = db.get('users').find({ email: email }).value();
-    if (existingUser) return res.status(409).json({ message: 'Email already registered' });
+    if (!name || !email || !password || !displayName) {
+        return res.status(400).json({ message: 'All fields are required.' });
+    }
 
-    const userId = getNextId();
-    const newUser = { id: userId, name, email, password, displayName: name }; // Simplified password storage for demo
-    
+    if (db.get('users').find({ email: email.toLowerCase() }).value()) {
+        return res.status(409).json({ message: 'User with this email already exists.' });
+    }
+
+    // Determine the next user ID
+    // 1. Get all existing IDs (which might be numbers or strings like 'u1')
+    // 2. Convert to numbers, ignoring non-numeric parts and default to 0
+    // 3. Find the maximum
+    // 4. Add 1
+    const maxId = Math.max(
+        0,
+        // FIX: Coerce 'id' to a string before calling replace() to handle numeric IDs from LowDB
+        ...db.get('users').map('id').value().map(id => parseInt(String(id).replace('u', '')) || 0),
+    );
+    const newId = maxId + 1;
+
+    // Create new user object
+    const newUser = {
+        // Use an integer ID for simplicity, matching other data keys
+        id: newId, 
+        name,
+        email: email.toLowerCase(),
+        password, // NOTE: In a real app, hash this password!
+        displayName,
+    };
+
+    // Save the new user
     db.get('users').push(newUser).write();
 
-    // Generate JWT token with user information
-    const token = jwt.sign({ userId: userId, name: name, email: email }, SECRET_KEY, { expiresIn: '24h' });
+    // Generate JWT token
+    const token = jwt.sign({ userId: newId, name: newUser.name, email: newUser.email }, SECRET_KEY, { expiresIn: '1h' });
 
-    // Return the token and user data
-    res.json({ token, user: { id: userId, name, email, displayName: name } });
+    res.status(201).json({ 
+        message: 'Registration successful. Please login.',
+        token, // For immediate login after registration if desired
+    });
 });
 
-// POST /api/login
+// --- User Login (Login) ---
 apiRouter.post('/login', (req, res) => {
     const { email, password } = req.body;
-    const user = db.get('users').find({ email: email, password: password }).value(); // Simple login check
 
-    if (!user) return res.status(401).json({ message: 'Invalid email or password' });
+    if (!email || !password) {
+        return res.status(400).json({ message: 'Email and password are required.' });
+    }
+
+    const user = db.get('users').find({ email: email.toLowerCase() }).value();
+
+    // Check if user exists and password is correct (simple comparison for this mock server)
+    if (!user || user.password !== password) {
+        return res.status(401).json({ message: 'Invalid email or password.' });
+    }
 
     // Generate JWT token
-    const token = jwt.sign({ userId: user.id, name: user.name, email: user.email }, SECRET_KEY, { expiresIn: '24h' });
+    const token = jwt.sign({ userId: user.id, name: user.name, email: user.email }, SECRET_KEY, { expiresIn: '1h' });
 
-    // Return the token and user data
-    res.json({ token, user: { id: user.id, name: user.name, email: user.email, displayName: user.name } });
+    // Return token and user display info
+    res.json({ 
+        message: 'Login successful', 
+        token,
+        displayName: user.displayName,
+    });
 });
 
 
-// --- INITIAL DATA FETCH (AFTER LOGIN) ---
-
-// GET /api/data - Fetches all data for the authenticated user
+// --- Get Initial Data (Authenticated) ---
 apiRouter.get('/data', authenticateToken, (req, res) => {
-    const { userId } = req.user;
-    const data = getUserData(userId);
-    res.json(data);
-});
-
-
-// --- CLASS MANAGEMENT ROUTES ---
-
-// POST /api/classes - Add a new class
-apiRouter.post('/classes', authenticateToken, (req, res) => {
-    const { name } = req.body;
-    const newClassId = getNextId();
     const userId = req.user.userId;
 
+    const { classes, students, attendance } = getUserData(userId);
+    
+    // Also send back the user's display name for profile setup
+    const userProfile = db.get('users').find({ id: userId }).value();
+    const displayName = userProfile ? userProfile.displayName : 'Instructor';
+
+    res.json({
+        classes,
+        students,
+        attendance,
+        displayName,
+        userId: userId.toString(), // Ensure userId is always a string for client-side state consistency
+    });
+});
+
+// --- Update Instructor Name (Authenticated) ---
+apiRouter.post('/profile', authenticateToken, (req, res) => {
+    const userId = req.user.userId;
+    const { displayName } = req.body;
+
+    if (!displayName || displayName.trim().length === 0) {
+        return res.status(400).json({ message: 'Display name cannot be empty.' });
+    }
+
+    // Find and update the user's displayName
+    db.get('users')
+        .find({ id: userId })
+        .assign({ displayName: displayName.trim() })
+        .write();
+
+    res.json({
+        message: 'Display name updated successfully',
+        displayName: displayName.trim(),
+    });
+});
+
+
+// --- Class Management ---
+
+// Add new class
+apiRouter.post('/classes', authenticateToken, (req, res) => {
+    const userId = req.user.userId;
+    const { name } = req.body;
+
+    if (!name || name.trim().length === 0) {
+        return res.status(400).json({ message: 'Class name is required.' });
+    }
+    
+    // Determine the next class ID
+    const maxId = Math.max(0, ...db.get('classes').map('id').value());
+    const newId = maxId + 1;
+
     const newClass = {
-        id: newClassId,
-        userId: userId, // Link class to user
-        name,
-        students: 0,
-        attendanceRate: 0,
+        id: newId,
+        userId: userId, // Link class to the creator/instructor
+        name: name.trim(),
+        students: 0, // Initial count
+        attendanceRate: 0, // Initial rate
+        createdAt: new Date().toISOString(),
     };
 
     db.get('classes').push(newClass).write();
-    
-    // Initialize students and attendance entries for the new class
-    db.get('students').value()[newClassId.toString()] = [];
-    db.get('attendance').value()[newClassId.toString()] = [];
+
+    // Initialize student and attendance storage for the new class
+    db.get('students').value()[newId.toString()] = [];
+    db.get('attendance').value()[newId.toString()] = [];
     db.write();
 
-    // Return updated classes list
+    // Return all classes for the user to update client state
+    const { classes: updatedClasses } = getUserData(userId);
+
     res.status(201).json({ 
-        message: 'Class added successfully', 
-        classes: db.get('classes').filter({ userId: userId }).value(),
+        message: 'Class added successfully',
+        classes: updatedClasses,
         newClass: newClass
     });
 });
 
+// Delete a class
+apiRouter.delete('/classes/:classId', authenticateToken, (req, res) => {
+    const userId = req.user.userId;
+    const classId = parseInt(req.params.classId);
 
-// --- STUDENT MANAGEMENT ROUTES ---
+    // Ensure the class exists and belongs to the user
+    const classToDelete = db.get('classes').find({ id: classId, userId: userId }).value();
+    if (!classToDelete) {
+        return res.status(404).json({ message: 'Class not found or unauthorized' });
+    }
 
-// POST /api/classes/:classId/students - Add a student to a class
+    // 1. Remove the class from the classes array
+    db.get('classes').remove({ id: classId }).write();
+
+    // 2. Remove students cache for this class
+    delete db.get('students').value()[classId.toString()];
+
+    // 3. Remove attendance history for this class
+    delete db.get('attendance').value()[classId.toString()];
+    
+    db.write(); // Commit changes after removing data from the objects
+
+    // Return updated data
+    const { classes: updatedClasses } = getUserData(userId);
+
+    res.json({ 
+        message: 'Class and all associated data deleted successfully',
+        classes: updatedClasses
+    });
+});
+
+
+// --- Student Management ---
+
+// Add a new student to a class
 apiRouter.post('/classes/:classId/students', authenticateToken, (req, res) => {
+    const userId = req.user.userId;
     const classId = parseInt(req.params.classId);
     const { name, registrationNumber } = req.body;
-    const userId = req.user.userId;
 
-    const classDoc = db.get('classes').find({ id: classId, userId: userId }).value();
-    if (!classDoc) return res.status(404).json({ message: 'Class not found or unauthorized' });
+    if (!name || !registrationNumber) {
+        return res.status(400).json({ message: 'Name and registration number are required.' });
+    }
 
-    const studentId = getNextId();
-    const newStudent = {
-        id: studentId,
-        name,
-        registrationNumber,
-        classId: classId,
-    };
+    // 1. Verify class ownership
+    const targetClass = db.get('classes').find({ id: classId, userId: userId }).value();
+    if (!targetClass) {
+        return res.status(404).json({ message: 'Class not found or unauthorized' });
+    }
 
     const classStudentsKey = classId.toString();
-    db.get('students').value()[classStudentsKey].push(newStudent);
-    db.write();
+    const currentStudents = db.get('students').value()[classStudentsKey] || [];
 
-    // Update class student count
+    // 2. Determine next student ID (unique within the class)
+    const maxId = Math.max(0, ...currentStudents.map(s => s.id));
+    const newId = maxId + 1;
+
+    const newStudent = {
+        id: newId, // Unique ID within the class
+        name: name.trim(),
+        registrationNumber: registrationNumber.trim(),
+        joinedAt: new Date().toISOString(),
+    };
+
+    // 3. Add the student
+    db.get('students').value()[classStudentsKey].push(newStudent);
+
+    // 4. Update class stats (student count)
     updateClassStats(classId); 
 
-    // Return updated students for the class and updated classes list
-    const updatedStudents = db.get('students').value()[classStudentsKey];
-    const updatedClasses = db.get('classes').filter({ userId: userId }).value();
+    db.write();
 
-    res.status(201).json({ 
-        message: 'Student enrolled successfully', 
+    // Return updated students and classes
+    const { classes: updatedClasses, students: updatedStudents } = getUserData(userId);
+
+    res.status(201).json({
+        message: 'Student enrolled successfully',
         students: updatedStudents,
         classes: updatedClasses
     });
 });
 
-// DELETE /api/classes/:classId/students/:studentId - Drop a student from a class
+// Delete a student from a class
 apiRouter.delete('/classes/:classId/students/:studentId', authenticateToken, (req, res) => {
+    const userId = req.user.userId;
     const classId = parseInt(req.params.classId);
     const studentId = parseInt(req.params.studentId);
-    const userId = req.user.userId;
 
-    const classDoc = db.get('classes').find({ id: classId, userId: userId }).value();
-    if (!classDoc) return res.status(404).json({ message: 'Class not found or unauthorized' });
+    // 1. Verify class ownership
+    const targetClass = db.get('classes').find({ id: classId, userId: userId }).value();
+    if (!targetClass) {
+        return res.status(404).json({ message: 'Class not found or unauthorized' });
+    }
 
     const classStudentsKey = classId.toString();
     
-    // 1. Remove student from the student list
-    const initialStudents = db.get('students').value()[classStudentsKey] || [];
-    const updatedStudents = initialStudents.filter(s => s.id !== studentId);
-    db.get('students').value()[classStudentsKey] = updatedStudents;
+    // 2. Remove the student from the class's student list
+    const studentsArray = db.get('students').value()[classStudentsKey];
+    if (studentsArray) {
+        db.get('students').value()[classStudentsKey] = studentsArray.filter(s => s.id !== studentId);
+    }
 
-    // 2. Remove all attendance records for this student in this class
-    const initialAttendance = db.get('attendance').value()[classStudentsKey] || [];
-    const updatedAttendance = initialAttendance.filter(r => r.studentId !== studentId);
-    db.get('attendance').value()[classStudentsKey] = updatedAttendance;
-    
-    db.write();
-    
-    // 3. Update class stats (student count, attendance rate)
+    // 3. Remove all attendance records for this student from the class's attendance history
+    const attendanceArray = db.get('attendance').value()[classStudentsKey];
+    if (attendanceArray) {
+        db.get('attendance').value()[classStudentsKey] = attendanceArray.filter(r => r.studentId !== studentId);
+    }
+
+    // 4. Update class stats (student count and attendance rate)
     updateClassStats(classId); 
-    
-    // Return updated data
-    const updatedClasses = db.get('classes').filter({ userId: userId }).value();
-    const updatedAttendanceFull = getUserData(userId).attendance;
 
-    res.json({ 
+    db.write();
+
+    // Return updated students and classes
+    const { classes: updatedClasses, students: updatedStudents, attendance: updatedAttendance } = getUserData(userId);
+
+    res.json({
         message: 'Student dropped successfully',
         students: updatedStudents,
         classes: updatedClasses,
-        attendance: updatedAttendanceFull
+        attendance: updatedAttendance
     });
 });
 
+// --- Attendance Management ---
 
-// --- ATTENDANCE ROUTES ---
-
-// POST /api/classes/:classId/attendance - Record attendance for a class
+// Record attendance for a class
 apiRouter.post('/classes/:classId/attendance', authenticateToken, (req, res) => {
-    const classId = parseInt(req.params.classId);
-    const { date, records } = req.body;
     const userId = req.user.userId;
+    const classId = parseInt(req.params.classId);
+    const { date, records } = req.body; // records is an array of { studentId, present }
 
-    const classDoc = db.get('classes').find({ id: classId, userId: userId }).value();
-    if (!classDoc) return res.status(404).json({ message: 'Class not found or unauthorized' });
-
-    // Validate records structure and date
     if (!date || !Array.isArray(records) || records.length === 0) {
-        return res.status(400).json({ message: 'Invalid attendance data provided.' });
+        return res.status(400).json({ message: 'Date and attendance records are required.' });
     }
 
-    // Format and append records
+    // Verify class ownership
+    const targetClass = db.get('classes').find({ id: classId, userId: userId }).value();
+    if (!targetClass) {
+        return res.status(404).json({ message: 'Class not found or unauthorized' });
+    }
+
+    // Map and format the incoming records for storage
     const formattedRecords = records.map(record => ({
-        date: date, // Attach the session date to each record
-        studentId: record.studentId,
+        date: date,
+        studentId: parseInt(record.studentId),
         present: record.present,
     }));
 
     const classAttendanceKey = classId.toString();
     // Append new records to the attendance history for the class
+    // NOTE: This simple version allows multiple attendance submissions for the same date/student.
+    // A robust system would check for and overwrite existing records for the same date.
     db.get('attendance').value()[classAttendanceKey].push(...formattedRecords);
     db.write();
 
@@ -340,8 +437,14 @@ app.listen(port, () => {
 /* Expected JSON payload structure for LowDB:
 {
   "users": [ { id: 1, name, email, password, displayName } ],
-  "classes": [ { id: 101, userId: 1, name, students, attendanceRate } ],
-  "students": { "101": [ { id: 201, name, registrationNumber, classId: 101 } ] },
-  "attendance": { "101": [ { date: "2023-10-06", studentId: 201, present: true } ] }
+  "classes": [ { id: 101, userId: 1, name, students: 0, attendanceRate: 0, createdAt: "..." } ],
+  "students": { 
+    "101": [ { id: 1, name, registrationNumber, joinedAt: "..." } ],
+    "102": [ ... ]
+  },
+  "attendance": {
+    "101": [ { date: "YYYY-MM-DD", studentId: 1, present: true } ],
+    "102": [ ... ]
+  }
 }
 */

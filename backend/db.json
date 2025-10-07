@@ -35,7 +35,7 @@
       "id": 3,
       "name": "COAL",
       "userId": "1759604283471",
-      "students": 1,
+      "students": 2,
       "attendanceRate": 0,
       "totalSessions": 0
     },
@@ -43,7 +43,7 @@
       "id": 1759604283474,
       "userId": 1759604283473,
       "name": "MAD",
-      "students": 0,
+      "students": 1,
       "attendanceRate": 0
     }
   ],
@@ -54,6 +54,12 @@
         "name": "Ali",
         "registrationNumber": "8282",
         "classId": 3
+      },
+      {
+        "id": 1759604283478,
+        "name": "Abdul",
+        "registrationNumber": "8579",
+        "joinedAt": "2025-10-07T05:43:15.783Z"
       }
     ],
     "c1": [
@@ -75,7 +81,14 @@
         "email": "bob@example.com"
       }
     ],
-    "1759604283474": []
+    "1759604283474": [
+      {
+        "id": 1,
+        "name": "Ali",
+        "registrationNumber": "8282",
+        "joinedAt": "2025-10-07T06:18:54.842Z"
+      }
+    ]
   },
   "attendance": {
     "3": [],

@@ -5,10 +5,9 @@ import { AppContext } from '../context/AppContext';
 import StudentCard from '../components/StudentCard';
 
 // Increased Height estimate for the button plus its container padding.
-// The previous value was 135. Adding another 50 for extra clearance/padding makes it 185.
-const BOTTOM_BUTTON_HEIGHT = 185; // 135 (previous) + 50 (extra padding requested) = 185
+const BOTTOM_BUTTON_HEIGHT = 185; 
 
-// --- Dedicated Modal Component for Enrollment (FIX APPLIED HERE) ---
+// --- Dedicated Modal Component for Enrollment ---
 const AddStudentModal = memo(({
     isVisible,
     onClose,
@@ -31,7 +30,6 @@ const AddStudentModal = memo(({
         >
             <View style={modalStyles.modalView}>
                 <Text style={modalStyles.modalTitle}>Enroll New Student</Text>
-                {/* Inputs now use the stable state setters passed via props */}
                 <TextInput
                     style={modalStyles.input}
                     placeholder="Student Name (e.g., Alice Johnson)"
@@ -39,7 +37,6 @@ const AddStudentModal = memo(({
                     onChangeText={setName}
                     placeholderTextColor="#999"
                     autoCapitalize="words"
-                    // Added autoFocus to help open directly into the first field
                     autoFocus={true} 
                     keyboardAppearance='light'
                 />
@@ -63,7 +60,6 @@ const AddStudentModal = memo(({
                     <TouchableOpacity
                         style={[modalStyles.button, modalStyles.submitButton]}
                         onPress={onSubmit}
-                        // Added input validation to disable button if fields are empty
                         disabled={isSubmitting || !name.trim() || !registrationNumber.trim()} 
                     >
                         {isSubmitting ? (
@@ -81,11 +77,15 @@ const AddStudentModal = memo(({
 
 export default function StudentsScreen({ route, navigation }) {
     const { classId, className } = route.params;
-    // We now rely on the global 'loading' state for general data fetching
     const { students, deleteStudent, loading, addStudent } = useContext(AppContext);
     
-    // Filter the global students cache for the current class
-    const classStudents = students[classId] || [];
+    // *** FIX APPLIED HERE ***
+    // 1. Convert classId (which is likely a number) to a string key.
+    // 2. Safely default the key to an empty string if classId is missing.
+    const classIdKey = classId ? classId.toString() : '';
+    
+    // 3. Filter the global students cache for the current class, ensuring the result is always an array ([]).
+    const classStudents = students[classIdKey] || [];
 
     const [isEnrollModalVisible, setEnrollModalVisible] = useState(false);
     const [newStudentName, setNewStudentName] = useState('');
@@ -105,13 +105,10 @@ export default function StudentsScreen({ route, navigation }) {
                     text: "Drop",
                     style: "destructive",
                     onPress: async () => {
-                        // Global loading state is set inside AppContext's deleteStudent function
                         const { success, message } = await deleteStudent(classId, studentId);
                         if (success) {
                             Alert.alert("Success", `${studentName} has been dropped from ${className}.`);
                         } else {
-                            // The deleteStudent function in AppContext handles its own Alert, 
-                            // but we ensure a message is available if it fails silently.
                             Alert.alert("Drop Failed", message || "An unknown error occurred while dropping the student.");
                         }
                     }
@@ -120,44 +117,34 @@ export default function StudentsScreen({ route, navigation }) {
         );
     };
     
-    /**
-     * FIX: Ensures the modal is closed and local state is reset immediately upon success.
-     */
     const handleEnrollStudent = async () => {
-        // Validation check is now handled in the submit button's disabled state in the modal component
         if (!newStudentName.trim() || !newRegistrationNumber.trim()) {
              Alert.alert('Missing Details', 'Please enter both student name and registration number.');
              return;
         }
 
-        setIsSubmitting(true); // Start local loading for the button
+        setIsSubmitting(true);
         
-        // Corrected call to addStudent to match the AppContext signature: (classId, name, registrationNumber)
         const { success, message } = await addStudent(
             classId, 
             newStudentName.trim(), 
             newRegistrationNumber.trim()
         );
 
-        // The global loading state is reset inside AppContext.js's addStudent function (in finally block).
-        setIsSubmitting(false); // Stop local loading for the button
+        setIsSubmitting(false);
 
         if (success) {
-            // Success: Close modal and reset inputs immediately
             Alert.alert("Success", "Student enrolled successfully.");
-            // Reset state and hide modal
             setNewStudentName('');
             setNewRegistrationNumber('');
             setEnrollModalVisible(false);
         } else {
-            // Failure: Show error and keep modal open for correction
             Alert.alert("Enrollment Failed", message || "An unknown error occurred.");
         }
     };
 
     const handleCloseModal = () => {
         setEnrollModalVisible(false);
-        // Clear inputs on close for a clean start next time
         setNewStudentName('');
         setNewRegistrationNumber('');
     }
@@ -170,7 +157,7 @@ export default function StudentsScreen({ route, navigation }) {
                 {/* Header */}
                 <View style={styles.header}>
                     <Text style={styles.title}>{className} Students</Text>
-                    <Text style={styles.subtitle}>{classStudents.length} Students Enrolled}</Text>
+                    <Text style={styles.subtitle}>{classStudents.length} Students Enrolled</Text>
                 </View>
 
                 {/* Main Content */}
@@ -189,7 +176,6 @@ export default function StudentsScreen({ route, navigation }) {
                             />
                         )}
                         keyExtractor={item => item.id.toString()}
-                        // Added padding to the bottom of the list so the last item is not hidden behind the fixed button
                         contentContainerStyle={[styles.listContent, { paddingBottom: BOTTOM_BUTTON_HEIGHT }]} 
                         ListEmptyComponent={<Text style={styles.emptyText}>No students are currently enrolled in this class.</Text>}
                     />
@@ -230,7 +216,6 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#F7F9FC', // Light background
     },
-    // New container for Header and FlatList to take up remaining space
     contentArea: {
         flex: 1,
         paddingHorizontal: 20, // Apply horizontal padding here
@@ -251,7 +236,6 @@ const styles = StyleSheet.create({
         color: '#64748B',
     },
     listContent: {
-        // Base padding for list items - extra bottom padding added inline in the component
         paddingVertical: 10, 
     },
     emptyText: {
@@ -270,11 +254,9 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#64748B',
     },
-    // New container to hold the button and ensure consistent bottom spacing
     bottomButtonContainer: {
         paddingHorizontal: 20,
         paddingTop: 10,
-        // *** CHANGE HERE: Increased paddingBottom by 50 (20 -> 70) to push the button up ***
         paddingBottom: 70, 
         backgroundColor: '#F7F9FC', // Match safeArea background
         borderTopWidth: 1,
