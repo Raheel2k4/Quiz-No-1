@@ -1,44 +1,61 @@
 import React, { useContext, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Modal, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+// CORRECTED: Added ActivityIndicator to the import list
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Modal, TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { AppContext } from '../context/AppContext';
 import ClassCard from '../components/ClassCard';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Header from '../components/Header';
 
 export default function DashboardScreen({ navigation }) {
-  const { classes, user, addClass } = useContext(AppContext);
+  // Added 'loading' from context to show an indicator
+  const { classes, addClass, loading } = useContext(AppContext);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [newClassName, setNewClassName] = useState('');
 
-  const totalStudents = classes.reduce((sum, cls) => sum + cls.students, 0);
+  // The calculation is safer with an empty array fallback
+  const totalStudents = (classes || []).reduce((sum, cls) => sum + (cls.students || 0), 0);
 
   const handleAddClass = () => {
     if (!newClassName.trim()) {
       Alert.alert('Error', 'Please enter a class name.');
       return;
     }
-    
     addClass(newClassName.trim());
-
     setNewClassName('');
     setIsModalVisible(false);
   };
 
-  const renderItem = ({ item }) => <ClassCard classItem={item} onPress={() => navigation.navigate('ClassDetail', { classId: item.id })} />;
+  const renderItem = ({ item }) => (
+    <ClassCard
+      classItem={item}
+      onPress={() => navigation.navigate('ClassDetail', { classId: item.id, className: item.name })}
+    />
+  );
+
+  // ADDED: Show a loading indicator in the center of the screen when data is being fetched
+  if (loading && classes.length === 0) {
+      return (
+          <SafeAreaView style={styles.safeArea}>
+              <Header title="Dashboard" navigation={navigation} showProfileButton={true} />
+              <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#4C51BF" />
+                  <Text style={styles.loadingText}>Loading Dashboard...</Text>
+              </View>
+          </SafeAreaView>
+      );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <Header title="Dashboard" navigation={navigation} />
+      <Header title="Dashboard" navigation={navigation} showProfileButton={true} />
 
       <View style={styles.container}>
-
-        {/* Overview Card */}
         <View style={styles.overviewCard}>
-          <Ionicons name="stats-chart" size={28} color="#007AFF" style={styles.overviewIcon} />
+          <Ionicons name="stats-chart" size={28} color="#4C51BF" style={styles.overviewIcon} />
           <Text style={styles.overviewTitle}>Overview</Text>
           <View style={styles.statsRow}>
             <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{classes.length}</Text>
+              <Text style={styles.statNumber}>{(classes || []).length}</Text>
               <Text style={styles.statLabel}>Total Classes</Text>
             </View>
             <View style={styles.statBox}>
@@ -48,16 +65,14 @@ export default function DashboardScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Action Button: View Reports */}
-        <TouchableOpacity 
-          style={styles.reportButton} 
+        <TouchableOpacity
+          style={styles.reportButton}
           onPress={() => navigation.navigate('Reports')}
         >
           <Ionicons name="bar-chart-outline" size={24} color="#FFFFFF" />
           <Text style={styles.reportButtonText}>View Attendance Reports</Text>
         </TouchableOpacity>
 
-        {/* Your Classes Section */}
         <View style={styles.sectionHeader}>
           <Ionicons name="school-outline" size={24} color="#333" />
           <Text style={styles.sectionTitle}>Your Classes</Text>
@@ -69,23 +84,22 @@ export default function DashboardScreen({ navigation }) {
           keyExtractor={item => item.id.toString()}
           style={styles.list}
           contentContainerStyle={{ paddingBottom: 50 }}
-          ListEmptyComponent={<Text style={styles.emptyList}>No classes found. Add a class below!</Text>}
+          ListEmptyComponent={<Text style={styles.emptyList}>No classes found. Add one below!</Text>}
         />
 
-        {/* Add Class Button - NOW OPENS MODAL */}
         <TouchableOpacity style={styles.addButton} onPress={() => setIsModalVisible(true)}>
-          <Text style={styles.addButtonText}>+ Add New Class</Text>
+          <Ionicons name="add-circle-outline" size={22} color="#4C51BF" />
+          <Text style={styles.addButtonText}>Add New Class</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Add New Class Modal */}
       <Modal
         animationType="slide"
         transparent={true}
         visible={isModalVisible}
         onRequestClose={() => setIsModalVisible(false)}
       >
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
           style={styles.modalOverlay}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
@@ -128,17 +142,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
   },
+  loadingContainer: { // New style for the loading view
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+  },
+  loadingText: { // New style for the loading text
+      marginTop: 10,
+      fontSize: 16,
+      color: '#6B7280',
+  },
   overviewCard: {
     backgroundColor: 'white',
     padding: 20,
     borderRadius: 15,
     marginBottom: 20,
-    flexDirection: 'column',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 5,
   },
   overviewTitle: {
     fontSize: 22,
@@ -163,7 +186,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#4C51BF',
   },
   statLabel: {
     fontSize: 14,
@@ -204,24 +227,27 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#fff',
     padding: 18,
     borderRadius: 12,
-    alignItems: 'center',
     marginTop: 10,
     marginBottom: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
   addButtonText: {
-    color: '#007AFF',
+    color: '#4C51BF',
     fontWeight: 'bold',
     fontSize: 18,
+    marginLeft: 8,
   },
   emptyList: {
     textAlign: 'center',
@@ -276,7 +302,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E7EB',
   },
   saveButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#4C51BF',
   },
   buttonText: {
     color: 'white',
@@ -284,3 +310,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
+

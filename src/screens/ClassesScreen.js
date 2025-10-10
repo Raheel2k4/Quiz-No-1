@@ -2,7 +2,6 @@ import React, { useContext } from 'react';
 import { View, Text, FlatList, StyleSheet, SafeAreaView } from 'react-native';
 import { AppContext } from '../context/AppContext';
 import ClassCard from '../components/ClassCard';
-import Header from '../components/Header';
 
 export default function ClassesScreen({ navigation }) {
   const { classes } = useContext(AppContext);
@@ -10,13 +9,13 @@ export default function ClassesScreen({ navigation }) {
   const renderItem = ({ item }) => (
     <ClassCard 
       classItem={item} 
-      onPress={() => navigation.navigate('ClassDetail', { classId: item.id })} 
+      onPress={() => navigation.navigate('ClassDetail', { classId: item.id, className: item.name })} 
     />
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="All Classes" navigation={navigation} />
+      {/* The custom Header component has been removed. The default navigator header will be used. */}
       <FlatList 
         data={classes} 
         renderItem={renderItem} 
@@ -43,3 +42,4 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
 });
+
