@@ -4,8 +4,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const AppContext = createContext();
 
-// Using the IP address from your recent code
-const API_BASE_URL = 'http://192.168.1.36:3000/api';
+// NOTE: Please ensure this IP address is correct for your local network.
+// You previously mentioned it was 192.168.186.1, I am using the one from the last version.
+const API_BASE_URL = 'http://10.0.7.179:3000/api';
 const AUTH_TOKEN_KEY = 'userAuthToken';
 
 const getAuthHeaders = (token) => ({
@@ -29,51 +30,72 @@ const decodeJwt = (token) => {
 
 export const AppContextProvider = ({ children }) => {
     const [user, setUser] = useState(null);
-    const [userId, setUserId] = useState(null);
-    const [displayName, setDisplayName] = useState('Instructor');
     const [isAuthReady, setIsAuthReady] = useState(false);
     const [classes, setClasses] = useState([]);
     const [students, setStudents] = useState({});
     const [attendance, setAttendance] = useState({});
+    const [displayName, setDisplayName] = useState('');
     const [loading, setLoading] = useState(false);
 
+    // This function now handles the initial token validation and data load.
+    useEffect(() => {
+        const validateTokenAndLoadData = async () => {
+            const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+            if (!token) {
+                setIsAuthReady(true);
+                return; // No token, proceed to login screen.
+            }
+
+            // Found a token, now validate it by fetching data.
+            setLoading(true);
+            try {
+                const response = await fetch(`${API_BASE_URL}/data`, { headers: getAuthHeaders(token) });
+                if (!response.ok) {
+                    throw new Error('Session expired. Please log in again.');
+                }
+                const data = await response.json();
+                
+                // If data fetch succeeds, the token is valid. Set user and all data.
+                setUser(decodeJwt(token));
+                setClasses(data.classes || []);
+                setStudents(data.students || {});
+                setAttendance(data.attendance || {});
+                setDisplayName(data.displayName || '');
+
+            } catch (error) {
+                console.error("Auth validation failed:", error.message);
+                // If validation fails, clear the bad token.
+                await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
+                setUser(null);
+            } finally {
+                // Mark auth as ready so the navigator can show the correct screen.
+                setLoading(false);
+                setIsAuthReady(true);
+            }
+        };
+
+        validateTokenAndLoadData();
+    }, []);
+
+    // A simplified refresh function for use after login or other actions.
     const refreshData = useCallback(async () => {
         setLoading(true);
         const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-        if (!token) {
-            setLoading(false);
-            return;
-        }
         try {
             const response = await fetch(`${API_BASE_URL}/data`, { headers: getAuthHeaders(token) });
-            if (!response.ok) throw new Error('Failed to fetch data.');
             const data = await response.json();
+            if (!response.ok) throw new Error('Failed to sync data.');
+            
             setClasses(data.classes || []);
             setStudents(data.students || {});
             setAttendance(data.attendance || {});
-            setDisplayName(data.displayName || 'Instructor');
-            setUserId(data.userId);
+            setDisplayName(data.displayName || '');
         } catch (error) {
-            Alert.alert('Connection Error', error.message);
+            Alert.alert('Sync Error', error.message);
         } finally {
             setLoading(false);
         }
     }, []);
-
-    useEffect(() => {
-        const checkAuth = async () => {
-            const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-            if (token) {
-                const userPayload = decodeJwt(token);
-                if (userPayload) {
-                    setUser(userPayload);
-                    await refreshData();
-                }
-            }
-            setIsAuthReady(true);
-        };
-        checkAuth();
-    }, [refreshData]);
 
     const login = async (email, password) => {
         setLoading(true);
@@ -84,18 +106,21 @@ export const AppContextProvider = ({ children }) => {
                 body: JSON.stringify({ email, password }),
             });
             const data = await response.json();
-            if (!response.ok) throw new Error(data.message);
+            if (!response.ok) throw new Error(data.message || 'Login failed.');
+            
             await AsyncStorage.setItem(AUTH_TOKEN_KEY, data.token);
-            const userPayload = decodeJwt(data.token);
-            setUser(userPayload);
-            await refreshData();
+            setUser(decodeJwt(data.token)); // Set user to trigger navigation
+            await refreshData(); // Load data for the new session
+            return { success: true };
         } catch (error) {
             Alert.alert('Login Failed', error.message);
-            setLoading(false);
+            setLoading(false); // Ensure loading stops on failure
+            return { success: false };
         }
     };
-
+    
     const register = async (name, email, password, displayName) => {
+        setLoading(true);
         try {
             const response = await fetch(`${API_BASE_URL}/register`, {
                 method: 'POST',
@@ -103,12 +128,14 @@ export const AppContextProvider = ({ children }) => {
                 body: JSON.stringify({ name, email, password, displayName }),
             });
             const data = await response.json();
-            if (!response.ok) throw new Error(data.message);
-            Alert.alert('Success', 'Registration successful! Please log in.');
+            if (!response.ok) throw new Error(data.message || 'Registration failed.');
+            Alert.alert('Success', 'Registration successful. Please log in.');
             return { success: true };
         } catch (error) {
             Alert.alert('Registration Failed', error.message);
             return { success: false };
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -118,123 +145,67 @@ export const AppContextProvider = ({ children }) => {
         setClasses([]);
         setStudents({});
         setAttendance({});
+        setDisplayName('');
     };
-
-    const setInstructorName = async (newDisplayName) => {
+    
+    const performApiAction = async (endpoint, options = {}, errorMessage) => {
         const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
         try {
-            const response = await fetch(`${API_BASE_URL}/profile`, {
-                method: 'POST',
+            const response = await fetch(`${API_BASE_URL}${endpoint}`, {
                 headers: getAuthHeaders(token),
-                body: JSON.stringify({ displayName: newDisplayName }),
+                ...options,
             });
             const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Update failed.');
+            if (!response.ok) throw new Error(data.message || errorMessage);
+            
             await refreshData();
-            return { success: true };
-        } catch (error) {
-            Alert.alert('Update Failed', error.message);
-            return { success: false };
-        }
-    };
-
-    const changePassword = async (currentPassword, newPassword) => {
-        const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-        try {
-            const response = await fetch(`${API_BASE_URL}/change-password`, {
-                method: 'POST',
-                headers: getAuthHeaders(token),
-                body: JSON.stringify({ currentPassword, newPassword }),
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Failed to change password.');
-            return { success: true, message: data.message };
-        } catch (error) {
-            Alert.alert('Error', error.message);
-            return { success: false, message: error.message };
-        }
-    };
-
-    const addClass = async (className) => {
-        const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-        try {
-            const response = await fetch(`${API_BASE_URL}/classes`, {
-                method: 'POST',
-                headers: getAuthHeaders(token),
-                body: JSON.stringify({ name: className }),
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Could not add class.');
-            await refreshData();
-            return { success: true };
+            return { success: true, data };
         } catch (error) {
             Alert.alert('Error', error.message);
             return { success: false };
         }
     };
 
-    const addStudent = async (classId, name, registrationNumber) => {
-        const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-        try {
-            const response = await fetch(`${API_BASE_URL}/classes/${classId}/students`, {
-                method: 'POST',
-                headers: getAuthHeaders(token),
-                body: JSON.stringify({ name, registrationNumber }),
-            });
-            if (!response.ok) throw new Error('Failed to enroll student.');
-            await refreshData();
-            return { success: true };
-        } catch (error) {
-            Alert.alert('Error', error.message);
-            return { success: false };
-        }
-    };
+    const addClass = (className) => performApiAction('/classes', {
+        method: 'POST',
+        body: JSON.stringify({ name: className }),
+    }, 'Could not add class.');
 
-    const deleteStudent = async (classId, studentId) => {
-        const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-        try {
-            const response = await fetch(`${API_BASE_URL}/classes/${classId}/students/${studentId}`, {
-                method: 'DELETE',
-                headers: getAuthHeaders(token),
-            });
-            if (!response.ok) throw new Error('Failed to drop student.');
-            await refreshData();
-            return { success: true };
-        } catch (error) {
-            Alert.alert('Error', error.message);
-            return { success: false };
-        }
-    };
+    const addStudent = (classId, name, registrationNumber) => performApiAction(`/classes/${classId}/students`, {
+        method: 'POST',
+        body: JSON.stringify({ name, registrationNumber }),
+    }, 'Failed to enroll student.');
 
-    const takeAttendance = async (classId, date, records) => {
-        const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-        try {
-            const response = await fetch(`${API_BASE_URL}/classes/${classId}/attendance`, {
-                method: 'POST',
-                headers: getAuthHeaders(token),
-                body: JSON.stringify({ date, records }),
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message);
-            await refreshData();
-            return { success: true };
-        } catch (error) {
-            Alert.alert('Error', error.message);
-            return { success: false };
-        }
-    };
+    const deleteStudent = (classId, studentId) => performApiAction(`/classes/${classId}/students/${studentId}`, {
+        method: 'DELETE',
+    }, 'Failed to drop student.');
+
+    const takeAttendance = (classId, date, records) => performApiAction(`/classes/${classId}/attendance`, {
+        method: 'POST',
+        body: JSON.stringify({ date, records }),
+    }, 'Failed to submit attendance.');
+
+    const setInstructorName = (newDisplayName) => performApiAction('/profile', {
+        method: 'POST',
+        body: JSON.stringify({ displayName: newDisplayName }),
+    }, 'Failed to update profile name.');
+
+    const changePassword = (currentPassword, newPassword) => performApiAction('/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword }),
+    }, 'Failed to change password.');
+
 
     return (
         <AppContext.Provider
             value={{
                 user,
-                userId,
                 isAuthReady,
-                loading,
                 classes,
                 students,
                 attendance,
                 displayName,
+                loading,
                 login,
                 register,
                 logout,
