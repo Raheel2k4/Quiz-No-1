@@ -1,46 +1,60 @@
-# 📚 Student Attendance Tracker  
-### *(React Native + Node.js/Express API with LowDB)*
+<div align="center">
 
-A complete mobile application for instructors to manage classes, enroll students, record attendance, and view performance analytics.  
-Frontend built with **React Native (Expo)** and backend powered by **Node.js/Express** with **LowDB** for lightweight persistence.
+# 📚 Student Attendance Tracker  
+### React Native (Expo) + Node.js/Express API + LowDB
+
+A complete mobile attendance management system for instructors — including authentication, class management, student enrollment, attendance tracking, and real-time performance reports.
 
 ---
 
-## 🚀 Key Features
+### 🚀 Tech Stack
+**Frontend:** React Native (Expo)  
+**Backend:** Node.js + Express  
+**Database:** LowDB (JSON-based storage)  
+**Auth:** JSON Web Tokens (JWT)
 
-### 🔐 Secure Authentication
-- JWT-based login and registration.
-- Each user accesses only their own data through user-scoped resources.
+---
+
+</div>
+
+---
+
+## ✨ Features
+
+### 🔐 Authentication
+- Secure login and registration
+- JWT-based sessions
+- User-specific (isolated) data storage
 
 ### 🗂️ Class Management
-- Create, view, and manage classes.
+- Create and manage classes
+- Students and attendance scoped per instructor
 
 ### 🧑‍🎓 Student Enrollment
-- Add/remove students to/from classes.
-- Student lists are isolated per instructor.
+- Add or remove students from a class
+- Clean UI with reusable components
 
 ### ✔️ Attendance Tracking
-- Quickly mark each student as **Present** or **Absent**.
-- Automatically records timestamped attendance sessions.
+- Mark students **Present/Absent** quickly
+- Time-stamped attendance entries
 
-### 📊 Real-time Reports & Analytics
-- Attendance percentages per student and per class.
-- Dashboard overview for fast insights.
-
----
-
-## 🛠️ Setup and Installation
-
-### **Prerequisites**
-- **Node.js v18+**
-- **npm or yarn**
-- **Expo Go** (on mobile device) or an emulator
+### 📊 Real-Time Reports
+- Attendance percentages
+- Class and student performance summaries
+- Dashboard overview for insights
 
 ---
 
-## Step 1: Backend (API Server) Setup
+## 🛠️ Installation & Setup
 
-The backend uses **Express + LowDB** to handle authentication and CRUD operations.
+### 📌 Prerequisites
+- Node.js **v18+**
+- npm or yarn
+- Expo Go (or mobile emulator)
+
+---
+
+# 1️⃣ Backend Setup (API Server)
 
 ```bash
 cd backend/
@@ -59,65 +73,67 @@ You should see:
 arduino
 Copy code
 Server listening at http://localhost:3000
-Keep this running during development.
+Keep this running while using the app.
 
-Step 2: Frontend (React Native) Setup
-Return to the project root:
+2️⃣ Frontend Setup (React Native)
+Go back to project root:
 
 bash
 Copy code
 cd ..
 Install frontend dependencies:
+
 bash
 Copy code
 npm install
 # or
 yarn install
-🔧 Crucial Step: Update the API Endpoint
-Mobile devices cannot access localhost from your computer.
-Update the API URL inside:
+🔧 IMPORTANT: Update API Base URL
+Open:
 
+bash
+Copy code
 src/context/AppContext.js
-
 Find:
 
 js
 Copy code
 const API_BASE_URL = 'http://192.168.186.1:3000/api';
-Replace 192.168.186.1 with your current local IPv4 address.
+Replace 192.168.186.1 with your computer’s current local IPv4 address.
 
-Check your local IP using:
+Check yours via:
 
 Windows: ipconfig
 
-macOS/Linux: ifconfig
+Mac/Linux: ifconfig
 
-Start the React Native App
+▶️ Run the App
 bash
 Copy code
 npm start
 # or
 expo start
-Scan the QR code with your Expo Go app to run on your device.
+On a device
+Scan the QR code using Expo Go.
 
-🔑 Default Test Credentials
+🔑 Default Login for Testing
 Field	Value
 Email	teacher@example.com
 Password	password123
 
-You may also create a new account using Sign Up.
+(You can also register a new account.)
 
-📂 Project Structure
+📁 Project Structure
 graphql
 Copy code
 .
 ├── backend/
-│   ├── server.js        # Express API server (auth, CRUD, reports)
-│   └── db.json          # LowDB JSON storage
+│   ├── server.js        # Express API logic (auth, CRUD, reporting)
+│   └── db.json          # LowDB storage file
 │
 ├── src/
 │   ├── context/
-│   │   └── AppContext.js    # Global state, API calls, user session
+│   │   └── AppContext.js        # Global state & API handler
 │   ├── components/
 │   │   ├── Header.js
 │   │   ├── StudentCard.js
@@ -129,4 +145,14 @@ Copy code
 │       ├── ClassesScreen.js
 │       └── ...
 │
-└── App.js               # Navigation (Stack + Tab navigators)
+└── App.js               # Navigation setup (Stack + Tabs)
+<div align="center">
+🎉 You're All Set!
+If you'd like:
+✨ UI improvements
+✨ API enhancements
+✨ Deployment guides
+✨ Database migrations
+Just ask — happy to help!
+
+</div> ```
