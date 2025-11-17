@@ -1,123 +1,46 @@
-📚 Student Attendance Tracker (React Native & Node.js API)
+# 📚 Student Attendance Tracker  
+### *(React Native + Node.js/Express API with LowDB)*
 
-This is a comprehensive mobile application built with React Native (Expo) for the frontend and a custom Node.js/Express API using LowDB for local data persistence. It allows instructors to manage classes, enroll students, record attendance, and view performance reports.
+A complete mobile application for instructors to manage classes, enroll students, record attendance, and view performance analytics.  
+Frontend built with **React Native (Expo)** and backend powered by **Node.js/Express** with **LowDB** for lightweight persistence.
 
-🚀 Key Features
+---
 
-Secure Authentication: User login and registration integrated with a local API using JWT for session management.
+## 🚀 Key Features
 
-Data Isolation: User-specific data (classes, students, attendance) are correctly scoped via the authenticated userId.
+### 🔐 Secure Authentication
+- JWT-based login and registration.
+- Each user accesses only their own data through user-scoped resources.
 
-Class Management: Create, view, and manage individual classes.
+### 🗂️ Class Management
+- Create, view, and manage classes.
 
-Student Enrollment: Add and remove students from specific classes.
+### 🧑‍🎓 Student Enrollment
+- Add/remove students to/from classes.
+- Student lists are isolated per instructor.
 
-Attendance Tracking: Dedicated screen to quickly mark students as Present/Absent for a session.
+### ✔️ Attendance Tracking
+- Quickly mark each student as **Present** or **Absent**.
+- Automatically records timestamped attendance sessions.
 
-Real-time Reports: Automatically calculated attendance rates displayed on the Dashboard and Reports screens.
+### 📊 Real-time Reports & Analytics
+- Attendance percentages per student and per class.
+- Dashboard overview for fast insights.
 
-🛠️ Setup and Installation
+---
 
-Prerequisites
+## 🛠️ Setup and Installation
 
-Node.js (v18+ recommended)
+### **Prerequisites**
+- **Node.js v18+**
+- **npm or yarn**
+- **Expo Go** (on mobile device) or an emulator
 
-Yarn or npm (for package management)
+---
 
-Expo Go app on your mobile device, or a mobile emulator.
+## Step 1: Backend (API Server) Setup
 
-Step 1: Backend (API Server) Setup
+The backend uses **Express + LowDB** to handle authentication and CRUD operations.
 
-The backend handles user authentication and data operations using Express and LowDB (which saves data to db.json).
-
-Navigate to the backend directory.
-
+```bash
 cd backend/
-
-
-Install dependencies. (You will need express, body-parser, lowdb, jsonwebtoken).
-
-npm install
-# OR
-yarn install
-
-
-Start the API Server. The server runs on port 3000.
-
-node server.js
-
-
-You should see the output: Server listening at http://localhost:3000. Keep this window running while developing the app.
-
-Step 2: Frontend (React Native) Setup
-
-Go back to the project root directory.
-
-cd ..
-
-
-Install frontend dependencies.
-
-npm install
-# OR
-yarn install
-
-
-Crucial Step: Update the API Endpoint
-
-Because mobile devices cannot access localhost on your development machine, you must update the API_BASE_URL in src/context/AppContext.js to your computer's local IP address.
-
-Current IP Setting in src/context/AppContext.js:
-
-const API_BASE_URL = '[http://192.168.186.1:3000/api](http://192.168.186.1:3000/api)'; 
-
-
-If your computer's IP address has changed, update 192.168.186.1 to your current local IPv4 address. (Check using ipconfig on Windows or ifconfig on Mac/Linux).
-
-Start the React Native App.
-
-npm start
-# OR
-expo start
-
-
-Run on Device: Scan the QR code displayed in the terminal or browser with the Expo Go app on your phone.
-
-🔑 Default Credentials
-
-You can use the following credentials, which are pre-populated in db.json, to test the authenticated flow:
-
-Field
-
-Value
-
-Email
-
-teacher@example.com
-
-Password
-
-password123
-
-You can also create a new account using the Sign Up option.
-
-📂 Project Structure Overview
-
-.
-├── backend/
-│   ├── server.js     # Express API server logic (handles auth, CRUD, stats)
-│   └── db.json       # LowDB database file (persists user data)
-├── src/
-│   ├── context/
-│   │   └── AppContext.js   # Global state, handles API calls, stores user data
-│   ├── components/
-│   │   ├── Header.js       # Custom header/nav logic
-│   │   ├── StudentCard.js  # Displays student info for lists
-│   │   └── (Other components...)
-│   └── screens/
-│       ├── LoginScreen.js
-│       ├── RegisterScreen.js
-│       ├── DashboardScreen.js
-│       ├── ClassesScreen.js
-│       └── (Other screen files...)
-└── App.js          # Main navigation setup (Stack & Tabs)
