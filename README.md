@@ -1,120 +1,167 @@
-📚 Student Attendance Tracker (React Native & Node.js API)
+# 📚 Student Attendance Tracker (React Native & Node.js API)
 
-This is a comprehensive mobile application designed for instructors to manage classes, enroll students, record attendance, and view performance reports. The application uses a React Native (Expo) frontend connected to a custom Node.js/Express API for data persistence.
+A complete mobile application for instructors to manage classes, enroll students, record attendance, and generate performance reports. Built using **React Native (Expo)** for the frontend and **Node.js/Express** with **LowDB** for backend data persistence.
 
-🚀 Key Features
+---
 
-Secure Authentication: User login and registration integrated with a local API using JWT for session management.
+## 🚀 Features
 
-Data Isolation: User-specific data (classes, students, attendance) are correctly scoped via the authenticated userId.
+### 🔐 Secure Authentication
 
-Class Management: Create, view, and manage individual classes with descriptive details.
+* Login & registration system using **JWT**.
+* Local API integration with persisted session tokens.
 
-Student Enrollment: Add and remove students from specific classes.
+### 🗂️ Data Isolation
 
-Attendance Tracking: Dedicated screen to quickly mark students as Present/Absent for any session.
+* All classes, students, and attendance data is scoped per **authenticated userId**.
 
-Real-time Reports: Automatically calculated class attendance rates displayed on the Dashboard and Reports screens.
+### 🎓 Class Management
 
-🛠️ Setup and Installation
+* Create, view, and manage classes with detailed info.
 
-Prerequisites
+### 👨‍🎓 Student Enrollment
 
-You must have the following installed on your development machine:
+* Add/remove students from any class.
+* Designed for fast classroom management.
 
-Node.js (v18+ recommended)
+### ✅ Attendance Tracking
 
-Yarn or npm
+* Quick Present/Absent marking.
+* Records multiple class sessions.
 
-Expo Go app on your mobile device, or a mobile emulator.
+### 📊 Real-time Reports
 
-Step 1: Backend (API Server) Setup
+* Automatically calculated attendance percentages.
+* Dashboard & Reports screen summaries.
 
-The backend uses Express and LowDB to handle authentication and store data in db.json.
+---
 
-Navigate to the backend directory.
+## 🛠️ Setup and Installation
 
+### **Prerequisites**
+
+Make sure you have installed:
+
+* **Node.js (v18+)**
+* **Yarn or npm**
+* **Expo Go** (mobile device) or an emulator
+
+---
+
+## 📡 Step 1: Backend (API Server) Setup
+
+Navigate to the backend folder:
+
+```bash
 cd backend/
+```
 
+Install dependencies:
 
-Install dependencies.
-
+```bash
 npm install
 # OR
 yarn install
+```
 
+Start the server:
 
-Start the API Server. The server runs on port 3000.
-
+```bash
 node server.js
+```
 
+Server will run at:
 
-Console Output: Server listening at http://localhost:3000
+```
+http://localhost:3000
+```
 
-Step 2: Frontend (React Native) Setup
+---
 
-Go back to the project root directory.
+## 📱 Step 2: Frontend (React Native App) Setup
 
+Go back to the project root:
+
+```bash
 cd ..
+```
 
+Install dependencies:
 
-Install frontend dependencies.
-
+```bash
 npm install
 # OR
 yarn install
+```
 
+### 🔗 Important: Set Your Local API Endpoint
 
-Crucial Step: Update the API Endpoint
+In:
 
-The app must connect to your local network IP. The API_BASE_URL in src/context/AppContext.js has been configured using your known IP address.
+```
+src/context/AppContext.js
+```
 
-// Current setting in src/context/AppContext.js
-const API_BASE_URL = '[http://192.168.186.1:3000/api](http://192.168.186.1:3000/api)'; 
+Update:
 
+```js
+const API_BASE_URL = "http://192.168.186.1:3000/api";
+```
 
-⚠️ IMPORTANT: If your local IP address (192.168.186.1) changes, you must manually update this value in src/context/AppContext.js to avoid network errors.
+⚠️ **If your local IP changes, update this URL.**
 
-Start the React Native App.
+Start the mobile app:
 
+```bash
 npm start
 # OR
 expo start
+```
 
+Open the app using **Expo Go** by scanning the QR code.
 
-Run on Device: Scan the QR code displayed in the terminal or browser with the Expo Go app on your mobile device.
+---
 
-🔑 Default Credentials
+## 🔑 Default Test Credentials
 
-Use the following credentials, pre-populated in db.json, to test the authenticated flow immediately:
+| Field    | Value                                             |
+| -------- | ------------------------------------------------- |
+| Email    | [teacher@example.com](mailto:teacher@example.com) |
+| Password | password123                                       |
 
-Field
+These credentials are preloaded inside `db.json`.
 
-Value
+---
 
-Email
+## 📂 Project Structure
 
-teacher@example.com
-
-Password
-
-password123
-
-📂 Project Structure Overview
-
+```
 .
 ├── backend/
-│   ├── server.js     # Express API and LowDB handlers
-│   └── db.json       # Local data store
+│   ├── server.js           
+│   └── db.json             
 ├── src/
 │   ├── context/
-│   │   └── AppContext.js   # Global state, API communication, Auth logic
+│   │   └── AppContext.js   
 │   ├── components/
-│   │   ├── Header.js       # Custom navigation header
-│   │   ├── StudentCard.js  # Displays student info for lists
-│   │   └── (Other UI components...)
+│   │   ├── Header.js
+│   │   ├── StudentCard.js
+│   │   └── (More components...)
 │   └── screens/
 │       ├── LoginScreen.js
 │       ├── DashboardScreen.js
-│       └── (All other screen views...)
-└── App.js          # Main navigation (Stack & Tabs) setup
+│       └── (All screens...)
+└── App.js
+```
+
+---
+
+## ⭐ Contributions
+
+Feel free to submit **issues** or **pull requests** to improve this project.
+
+---
+
+## 👨‍🏫 Author
+
+Student Attendance Tracker built with ❤️ for educational use.
