@@ -44,3 +44,89 @@ The backend uses **Express + LowDB** to handle authentication and CRUD operation
 
 ```bash
 cd backend/
+Install dependencies:
+bash
+Copy code
+npm install
+# or
+yarn install
+Start the server:
+bash
+Copy code
+node server.js
+You should see:
+
+arduino
+Copy code
+Server listening at http://localhost:3000
+Keep this running during development.
+
+Step 2: Frontend (React Native) Setup
+Return to the project root:
+
+bash
+Copy code
+cd ..
+Install frontend dependencies:
+bash
+Copy code
+npm install
+# or
+yarn install
+🔧 Crucial Step: Update the API Endpoint
+Mobile devices cannot access localhost from your computer.
+Update the API URL inside:
+
+src/context/AppContext.js
+
+Find:
+
+js
+Copy code
+const API_BASE_URL = 'http://192.168.186.1:3000/api';
+Replace 192.168.186.1 with your current local IPv4 address.
+
+Check your local IP using:
+
+Windows: ipconfig
+
+macOS/Linux: ifconfig
+
+Start the React Native App
+bash
+Copy code
+npm start
+# or
+expo start
+Scan the QR code with your Expo Go app to run on your device.
+
+🔑 Default Test Credentials
+Field	Value
+Email	teacher@example.com
+Password	password123
+
+You may also create a new account using Sign Up.
+
+📂 Project Structure
+graphql
+Copy code
+.
+├── backend/
+│   ├── server.js        # Express API server (auth, CRUD, reports)
+│   └── db.json          # LowDB JSON storage
+│
+├── src/
+│   ├── context/
+│   │   └── AppContext.js    # Global state, API calls, user session
+│   ├── components/
+│   │   ├── Header.js
+│   │   ├── StudentCard.js
+│   │   └── ...
+│   └── screens/
+│       ├── LoginScreen.js
+│       ├── RegisterScreen.js
+│       ├── DashboardScreen.js
+│       ├── ClassesScreen.js
+│       └── ...
+│
+└── App.js               # Navigation (Stack + Tab navigators)
